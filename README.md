@@ -38,7 +38,7 @@ cd multi-tenant
 ### 2. Copy Environment Config
 
 ```bash
-cp config/config.example.yaml config/config.yaml
+cp config.example.yaml config.yaml
 ```
 
 ---
