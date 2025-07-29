@@ -1,16 +1,3 @@
-Here's a complete `README.md` that includes:
-
-✅ Project overview
-✅ Requirements
-✅ Setup instructions
-✅ ✅ Migration steps using `golang-migrate`
-✅ Running with Docker
-✅ API overview
-
----
-
-## 📘 `README.md`
-
 ````markdown
 # Multi-Tenant Messaging System (Go + RabbitMQ + PostgreSQL)
 
