@@ -1,28 +1,18 @@
-````markdown
-# Multi-Tenant Messaging System (Go + RabbitMQ + PostgreSQL)
+# 📨 Multi-Tenant Messaging System (Go + RabbitMQ + PostgreSQL)
 
-This project is a scalable multi-tenant message processing system built in Go with:
-
-- RabbitMQ for message queues
-- PostgreSQL for metadata storage
-- Dynamic worker pool per tenant
-- JWT-based API authentication
-- Cursor-based message listing
-- Prometheus metrics
-- Dead-letter queue support
+This project is a scalable multi-tenant message processing platform built in Go, designed for concurrent processing of messages using RabbitMQ and PostgreSQL. It supports dynamic per-tenant concurrency, JWT-secured APIs, cursor-based pagination, and Prometheus monitoring.
 
 ---
 
-## 🚀 Features
+## ✨ Features
 
-- Multi-tenant queue consumers
-- Per-tenant concurrency control
-- Graceful worker pool scaling
-- JWT-authenticated API
-- Swagger documentation
-- PostgreSQL + RabbitMQ via Docker Compose
-- Dead-letter retry queues
-- Prometheus integration
+- ✅ Multi-tenant architecture
+- ✅ Dynamic worker pool per tenant
+- ✅ RabbitMQ + PostgreSQL integration
+- ✅ JWT authentication
+- ✅ Swagger docs
+- ✅ Dead-letter queue retry logic
+- ✅ Prometheus metrics and queue depth monitoring
 
 ---
 
@@ -31,12 +21,12 @@ This project is a scalable multi-tenant message processing system built in Go wi
 - Go 1.22+
 - PostgreSQL 13+
 - RabbitMQ 3.8+
-- [golang-migrate](https://github.com/golang-migrate/migrate) CLI
-- Docker (optional for running locally)
+- [`golang-migrate`](https://github.com/golang-migrate/migrate) CLI
+- Docker (optional for local development)
 
 ---
 
-## 🛠 Setup Instructions
+## 🛠 Setup
 
 ### 1. Clone the Repo
 
@@ -45,6 +35,12 @@ git clone git@github.com:rinaldypasya/multi-tenant.git
 cd multi-tenant
 ````
 
+### 2. Copy Environment Config
+
+```bash
+cp config/config.example.yaml config/config.yaml
+```
+
 ---
 
 ## 🗂 Project Structure
@@ -52,92 +48,98 @@ cd multi-tenant
 ```
 .
 ├── cmd/              # App entry point
-├── config/           # Config loader
 ├── internal/
-│   ├── api/          # REST API handlers
+│   ├── api/          # REST API
 │   ├── auth/         # JWT logic
-│   ├── consumer/     # Consumer wrapper
+│   ├── config/       # Config loader
+│   ├── consumer/     # Tenant worker consumer
 │   ├── messaging/    # RabbitMQ wrapper
-|   ├── migration/    # SQL migrations
-│   ├── model/        # Shared structs
-│   ├── storage/      # DB access
+│   ├── migration/    # SQL migrations
+│   ├── model/        # Shared models
+│   ├── storage/      # PostgreSQL interaction
 │   ├── tenant/       # Tenant manager
 │   ├── worker/       # Worker pool
+├── docs/             # Swagger-generated files
 ├── docker-compose.yml
 ```
 
 ---
 
-## 🔃 Database Migration Steps
+## 🔃 Database Migrations
 
-We use [golang-migrate](https://github.com/golang-migrate/migrate) for database schema management.
+We use [`golang-migrate`](https://github.com/golang-migrate/migrate) to manage schema.
 
-### ✅ Install CLI
+### 1. Install Migrate CLI
 
 ```bash
 brew install golang-migrate
-# or for Linux
+# or
 curl -L https://github.com/golang-migrate/migrate/releases/latest/download/migrate.linux-amd64.tar.gz | tar xvz
 sudo mv migrate /usr/local/bin
 ```
 
-### ✅ Create a new migration
+### 2. Create Migration
 
 ```bash
-migrate create -ext sql -dir internal/migration -seq add_tenants_table
+migrate create -ext sql -dir db/migrations -seq add_tenants_table
 ```
 
-This will create:
-
-```
-db/migrations/
-  000001_add_tenants_table.up.sql
-  000001_add_tenants_table.down.sql
-```
-
-### ✅ Run migration
+### 3. Run Migration
 
 ```bash
-migrate -path internal/migration \
+migrate -path db/migrations \
   -database "postgres://user:password@localhost:5432/yourdb?sslmode=disable" \
   up
 ```
 
-### ✅ Rollback migration
+---
+
+## 📘 Swagger API Docs
+
+This project uses [Swaggo](https://github.com/swaggo/swag) to generate OpenAPI 3 docs.
+
+### 1. Install `swag` CLI
 
 ```bash
-migrate -path internal/migration \
-  -database "postgres://user:password@localhost:5432/yourdb?sslmode=disable" \
-  down 1
+go install github.com/swaggo/swag/cmd/swag@latest
+export PATH="$PATH:$(go env GOPATH)/bin"
 ```
 
----
-
-## 🐳 Running via Docker Compose
+### 2. Generate Swagger Files
 
 ```bash
-docker-compose up -d
+swag init -g cmd/main.go -o ./docs
 ```
 
-This runs:
+### 3. Access Swagger UI
 
-* PostgreSQL (port `5432`)
-* RabbitMQ (port `5672`, dashboard on `15672`)
-* App container (port `8080`)
+Start the app and visit:
+
+```
+http://localhost:8080/swagger/index.html
+```
 
 ---
 
-## 🛡️ Authentication
+## 🧪 Testing with Postman
 
-Use `/auth/token` with a tenant UUID to get a JWT token:
+You can import the generated Swagger file into Postman:
 
-```json
-POST /auth/token
-{
-  "tenant_id": "your-tenant-uuid"
-}
+```bash
+# after swag init
+docs/swagger.json
 ```
 
-Use the token in `Authorization: Bearer` headers for all authenticated endpoints.
+Postman → `Import` → `Upload Files` → choose `swagger.json`.
 
 ---
+
+## 🐳 Running with Docker Compose
+
+```bash
+docker-compose up --build
+```
+
+* PostgreSQL: `localhost:5432`
+* RabbitMQ: `localhost:5672`, dashboard on `localhost:15672` (user/pass: guest/guest)
+* App: `localhost:8080`
