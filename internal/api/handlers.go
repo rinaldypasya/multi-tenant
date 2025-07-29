@@ -7,34 +7,24 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	httpSwagger "github.com/swaggo/http-swagger"
 
 	"multi-tenant/internal/auth"
-	"multi-tenant/internal/metrics"
 )
 
 func (a *API) Router() http.Handler {
-	r := chi.NewRouter()
-
-	// Swagger
-	r.Get("/swagger/*", httpSwagger.WrapHandler)
-
-	// Metrics
-	r.Get("/metrics", metrics.Handler().ServeHTTP)
-
 	// Public
-	r.Post("/tenants", a.CreateTenant)
-	r.Delete("/tenants/{id}", a.DeleteTenant)
+	a.Routers.Post("/tenants", a.CreateTenant)
+	a.Routers.Delete("/tenants/{id}", a.DeleteTenant)
 
 	// Secured
-	r.Group(func(r chi.Router) {
+	a.Routers.Group(func(r chi.Router) {
 		r.Use(auth.JWTAuthMiddleware)
 
 		r.Put("/tenants/{id}/config/concurrency", a.UpdateConcurrency)
 		r.Get("/messages", a.ListMessages)
 	})
 
-	return r
+	return a.Routers
 }
 
 // @Summary Create a tenant

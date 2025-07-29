@@ -15,7 +15,12 @@ import (
 	"multi-tenant/internal/messaging"
 	"multi-tenant/internal/metrics"
 	"multi-tenant/internal/storage"
-	"multi-tenant/internal/worker"
+
+	_ "multi-tenant/docs" // swagger generated docs
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // @title Multi-Tenant Messaging API
@@ -62,41 +67,45 @@ func main() {
 	rabbitConn := rabbitClient.GetConnection() // use connection from exposed channel
 	tm := manager.NewTenantManager(rabbitConn, rabbitClient, db)
 
-	// Start background loop for updating queue depth metrics
+	// Load tenants from DB and start pools
+	tenants, err := db.ListTenants()
+	if err != nil {
+		log.Fatalf("failed to list tenants: %v", err)
+	}
+	for _, t := range tenants {
+		if err := tm.AddTenant(t.ID); err != nil {
+			log.Printf("warn: add tenant %s: %v", t.ID, err)
+			continue
+		}
+		if err := tm.SetWorkerCount(t.ID.String(), t.Concurrency); err != nil {
+			log.Printf("warn: set concurrency %s: %v", t.ID, err)
+		}
+	}
+
+	// Prometheus loop
 	go func() {
 		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
-		for {
-			select {
-			case <-ticker.C:
-				for _, tenantID := range tm.ListTenantIDs() {
-					rabbitClient.UpdateQueueDepth(tenantID)
-				}
+		for range ticker.C {
+			for _, tid := range tm.ListTenantIDs() {
+				rabbitClient.UpdateQueueDepth(tid)
 			}
 		}
 	}()
 
-	// Recover Existing Tenants
-	tenants, err := db.ListTenants()
-	if err != nil {
-		log.Fatalf("Failed to load tenants: %v", err)
-	}
+	// HTTP server
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
 
-	for _, tenant := range tenants {
-		if err := tm.AddTenant(tenant.ID); err != nil {
-			log.Printf("⚠️ Failed to recover tenant %s: %v", tenant.ID, err)
-			continue
-		}
+	// Swagger
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 
-		// Optional: Start default worker pool
-		pool := worker.NewWorkerPool(tenant.ID.String(), rabbitClient, cfg.Workers)
-		pool.Start()
-		log.Printf("🔁 Recovered tenant %s", tenant.ID)
-	}
+	// Metrics
+	r.Get("/metrics", metrics.Handler().ServeHTTP)
 
-	// Init API
-	apiHandler := api.NewAPI(tm, db, cfg)
+	apiHandler := api.NewAPI(tm, db, cfg, r)
 	server := &http.Server{
 		Addr:    ":8080",
 		Handler: apiHandler.Router(),
